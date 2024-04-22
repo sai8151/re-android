@@ -8,6 +8,7 @@ import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
 import android.os.Bundle;
+import android.speech.tts.TextToSpeech;
 import android.util.Log;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
@@ -24,6 +25,7 @@ import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.Locale;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -34,6 +36,10 @@ public class MainActivity extends AppCompatActivity {
     private LocationManager locationManager;
     private WebView webView;
     TextView messageTextView;
+    TextToSpeech tts;
+    // Declare variables to store previous message and timestamp
+    String previousMessage = "";
+    long lastUpdateTime = 0;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -49,6 +55,15 @@ public class MainActivity extends AppCompatActivity {
 
         // Initialize location manager
         locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+// Inside your activity or fragment
+        tts = new TextToSpeech(getApplicationContext(), new TextToSpeech.OnInitListener() {
+            @Override
+            public void onInit(int status) {
+                if (status != TextToSpeech.ERROR) {
+                    tts.setLanguage(Locale.US); // Set desired language
+                }
+            }
+        });
 
         // Check location permissions
         if (checkLocationPermissions()) {
@@ -65,6 +80,10 @@ public class MainActivity extends AppCompatActivity {
         super.onDestroy();
         // Stop location updates when the activity is destroyed
         stopLocationUpdates();
+        if (tts != null) {
+            tts.stop();
+            tts.shutdown();
+        }
     }
 
     private boolean checkLocationPermissions() {
@@ -212,6 +231,16 @@ public class MainActivity extends AppCompatActivity {
                         public void run() {
                             String message = response.toString();
                             messageTextView.setText(message);
+
+                            long currentTime = System.currentTimeMillis();
+                            // Check if message is different or if it's been 30 seconds since last update
+                            if (!message.equals(previousMessage) || (currentTime - lastUpdateTime) >= 30000) {
+                                // Speak out the message
+                                tts.speak(message, TextToSpeech.QUEUE_FLUSH, null, null);
+                                // Update previous message and timestamp
+                                previousMessage = message;
+                                lastUpdateTime = currentTime;
+                            }
                         }
                     });
 
@@ -221,7 +250,7 @@ public class MainActivity extends AppCompatActivity {
                     e.printStackTrace();
                 }
 
-                // Fetch and display message every 3 seconds
+                // Fetch and display message every 30 seconds
                 try {
                     Thread.sleep(3000);
                     fetchAndDisplayMessage();
@@ -231,5 +260,6 @@ public class MainActivity extends AppCompatActivity {
             }
         }).start();
     }
+
 
 }
